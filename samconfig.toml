@@ -4,6 +4,6 @@ version = 0.1
 [default.deploy]
 
 [default.deploy.parameters]
-stack_name = "aws-codepipeline-cicd-resources"
+stack_name = "aws-codepipeline-cicd-resources-prime"
 confirm_changeset = false
 capabilities = "CAPABILITY_NAMED_IAM"
