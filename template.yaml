@@ -135,6 +135,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: MissingArtifactsBucket
     DeletionPolicy: "Retain"
+    UpdateReplacePolicy: "Retain"
     Properties:
       Tags:
         - Key: ManagedStackSource
@@ -190,6 +191,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: MissingArtifactsBucket
     DeletionPolicy: "Retain"
+    UpdateReplacePolicy: "Retain"
     Properties:
       AccessControl: "LogDeliveryWrite"
       Tags:
