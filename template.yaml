@@ -2,6 +2,8 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
 Parameters:
+  ServiceEnv:
+    Type: String
   PipelineUserArn:
     Type: String
   PipelineExecutionRoleArn:
@@ -83,6 +85,15 @@ Resources:
               - Effect: Allow
                 Action: '*'
                 Resource: '*'
+
+  CloudFormationExecutionRoleArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: MissingCloudFormationExecutionRole
+    Properties:
+      Name: !Sub "/cicd/${ServiceEnv}/CfnExecutionRoleArn"
+      Type: "String"
+      Description: "CloudFormation Execution IAM Role ARN"
+      Value: !GetAtt CloudFormationExecutionRole.Arn
 
   PipelineExecutionRole:
     Type: AWS::IAM::Role
