@@ -4,6 +4,9 @@ Transform: AWS::Serverless-2016-10-31
 Parameters:
   ServiceEnv:
     Type: String
+  GitProviderType:
+    Type: String
+    Default: "GitHub"
   PipelineUserArn:
     Type: String
   PipelineExecutionRoleArn:
@@ -20,6 +23,7 @@ Parameters:
     Type: String
 
 Conditions:
+  MissingGitProviderType: !Not [!Equals [!Ref GitProviderType, ""]]
   MissingPipelineUser: !Equals [!Ref PipelineUserArn, ""]
   MissingPipelineExecutionRole: !Equals [!Ref PipelineExecutionRoleArn, ""]
   MissingCloudFormationExecutionRole: !Equals [!Ref CloudFormationExecutionRoleArn, ""]
@@ -291,8 +295,31 @@ Resources:
                   - !GetAtt ImageRepository.Arn
                   - !Ref ImageRepositoryArn
             - !Ref AWS::NoValue
+          - Fn::If:
+            - MissingGitProviderType
+            - Effect: "Allow"
+              Action:
+                - "codestar-connections:UseConnection"
+              Resource: !Ref CodeStarConnection
+            - !Ref AWS::NoValue
       Roles:
         - !Ref PipelineExecutionRole
+
+  CodeStarConnection:
+    Type: AWS::CodeStarConnections::Connection
+    Condition: MissingGitProviderType
+    Properties:
+      ConnectionName: GitRepositoryConnection
+      ProviderType: !Ref GitProviderType
+
+  CodeStarConnectionArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: MissingGitProviderType
+    Properties:
+      Type: String
+      Description: "ARN of CodeStar connection"
+      Name: !Sub "/cicd/${ServiceEnv}/CodeStarConnectionArn"
+      Value: !Ref CodeStarConnection
 
   ImageRepository:
     Type: AWS::ECR::Repository
