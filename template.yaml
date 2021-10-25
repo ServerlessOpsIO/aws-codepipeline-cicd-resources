@@ -151,6 +151,15 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+  ArtifactsBucketSsmParameter:
+    Type: AWS::SSM::Parameter
+    Condition: MissingArtifactsBucket
+    Properties:
+      Name: !Sub "/cicd/${ServiceEnv}/ArtifactsBucket"
+      Type: "String"
+      Description: "Artifacts bucket name"
+      Value: !Ref ArtifactsBucket
+
   ArtifactsBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Condition: MissingArtifactsBucket
