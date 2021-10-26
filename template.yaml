@@ -135,6 +135,16 @@ Resources:
               StringEquals:
                 aws:PrincipalTag/Role: aws-sam-pipeline-codebuild-service-role
 
+  PipelineExecutionRoleArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: MissingPipelineExecutionRole
+    Properties:
+      Name: !Sub "/cicd/${ServiceEnv}/PipelineExecutionRoleArn"
+      Type: "String"
+      Description: "Shared build pipelineeExecution IAM Role ARN"
+      Value: !GetAtt PipelineExecutionRole.Arn
+
+
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Condition: MissingArtifactsBucket
