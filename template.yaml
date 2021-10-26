@@ -263,6 +263,11 @@ Resources:
                 - !Ref CloudFormationExecutionRoleArn
           - Effect: Allow
             Action:
+              - "codebuild:StartBuild"
+              - "codebuild:BatchGetBuilds"
+            Resource: "*"
+          - Effect: Allow
+            Action:
               - "cloudformation:CreateChangeSet"
               - "cloudformation:DescribeChangeSet"
               - "cloudformation:ExecuteChangeSet"
