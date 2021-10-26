@@ -132,8 +132,10 @@ Resources:
             Action:
               - 'sts:AssumeRole'
             Condition:
-              StringEquals:
-                aws:PrincipalTag/Role: aws-sam-pipeline-codebuild-service-role
+                StringLike:
+                  aws:PrincipalTag/Role:
+                  - aws-sam-pipeline-codebuild-service-role
+                  - aws-sam-pipeline-codepipeline-execution-role
 
   PipelineExecutionRoleArnSsmParam:
     Type: AWS::SSM::Parameter
