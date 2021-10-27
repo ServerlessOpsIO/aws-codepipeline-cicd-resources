@@ -7,6 +7,9 @@ Parameters:
   GitProviderType:
     Type: String
     Default: "GitHub"
+  DeployAccounts:
+    Type: CommaDelimitedList
+    Default: ""
   PipelineUserArn:
     Type: String
   PipelineExecutionRoleArn:
@@ -28,6 +31,7 @@ Conditions:
   MissingPipelineExecutionRole: !Equals [!Ref PipelineExecutionRoleArn, ""]
   MissingCloudFormationExecutionRole: !Equals [!Ref CloudFormationExecutionRoleArn, ""]
   MissingArtifactsBucket: !Equals [!Ref ArtifactsBucketArn, ""]
+  MissingDeployAccounts: !Equals [!Select [0, !Ref DeployAccounts], ""]
   ShouldHaveImageRepository: !Or [!Equals [!Ref CreateImageRepository, "true"], !Not [!Equals [!Ref ImageRepositoryArn, ""]]]
   MissingImageRepository: !And [!Condition ShouldHaveImageRepository, !Equals [!Ref ImageRepositoryArn, ""]]
 
@@ -73,6 +77,8 @@ Resources:
       Tags:
         - Key: ManagedStackSource
           Value: AwsSamCli
+        - Key: Role
+          Value: cloudformation-execution-role
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -211,6 +217,30 @@ Resources:
                   - MissingCloudFormationExecutionRole
                   - !GetAtt CloudFormationExecutionRole.Arn
                   - !Ref CloudFormationExecutionRoleArn
+            Condition:
+                StringLike:
+                  aws:PrincipalTag/Role:
+                    - aws-sam-pipeline-codebuild-service-role
+                    - aws-sam-pipeline-codepipeline-execution-role
+          - Fn::If:
+            - MissingDeployAccounts
+            - !Ref AWS::NoValue
+            - Effect: "Allow"
+              Action:
+                - 's3:GetObject*'
+                - 's3:PutObject*'
+                - 's3:GetBucket*'
+                - 's3:List*'
+              Resource:
+                - !Join ['',[!GetAtt ArtifactsBucket.Arn, '/*']]
+                - !GetAtt ArtifactsBucket.Arn
+              Principal:
+                AWS: !Ref DeployAccounts
+              Condition:
+                  StringLike:
+                    aws:PrincipalTag/Role:
+                      - cloudformation-execution-role
+                      - pipeline-execution-role
 
   ArtifactsLoggingBucket:
     Type: AWS::S3::Bucket
