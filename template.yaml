@@ -117,6 +117,7 @@ Resources:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
+          # FIXME: Need to prevent deploy account roles from assuming build account role
           - Action:
               - "sts:AssumeRole"
             Effect: Allow
@@ -146,6 +147,7 @@ Resources:
             Condition:
                 StringLike:
                   aws:PrincipalTag/Role:
+                  - pipeline-execution-role
                   - aws-sam-pipeline-codebuild-service-role
                   - aws-sam-pipeline-codepipeline-execution-role
 
@@ -290,6 +292,13 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:ResourceTag/Role: pipeline-execution-role
           - Effect: Allow
             Action: 'iam:PassRole'
             Resource:
