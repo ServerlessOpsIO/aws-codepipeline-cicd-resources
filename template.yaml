@@ -54,7 +54,7 @@ Resources:
                 Resource: "*"
                 Condition:
                   StringEquals:
-                    aws:ResourceTag/Role: pipeline-execution-role
+                    aws:ResourceTag/Role: codepipeline-execution-role
 
   PipelineUserAccessKey:
     Type: AWS::IAM::AccessKey
@@ -113,7 +113,7 @@ Resources:
         - Key: ManagedStackSource
           Value: AwsSamCli
         - Key: Role
-          Value: pipeline-execution-role
+          Value: codepipeline-execution-role
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -147,9 +147,8 @@ Resources:
             Condition:
                 StringLike:
                   aws:PrincipalTag/Role:
-                  - pipeline-execution-role
-                  - aws-sam-pipeline-codebuild-service-role
-                  - aws-sam-pipeline-codepipeline-execution-role
+                  - codepipeline-execution-role
+                  - codebuild-service-role
 
   PipelineExecutionRoleArnSsmParam:
     Type: AWS::SSM::Parameter
@@ -228,8 +227,8 @@ Resources:
             Condition:
                 StringLike:
                   aws:PrincipalTag/Role:
-                    - aws-sam-pipeline-codebuild-service-role
-                    - aws-sam-pipeline-codepipeline-execution-role
+                    - codepipeline-execution-role
+                    - cloudformation-execution-role
           - Fn::If:
             - MissingDeployAccounts
             - !Ref AWS::NoValue
@@ -247,8 +246,9 @@ Resources:
               Condition:
                   StringLike:
                     aws:PrincipalTag/Role:
+                      - codepipeline-execution-role
+                      - codebuild-service-role
                       - cloudformation-execution-role
-                      - pipeline-execution-role
 
   ArtifactsLoggingBucket:
     Type: AWS::S3::Bucket
@@ -298,7 +298,7 @@ Resources:
             Resource: "*"
             Condition:
               StringEquals:
-                aws:ResourceTag/Role: pipeline-execution-role
+                aws:ResourceTag/Role: codepipeline-execution-role
           - Effect: Allow
             Action: 'iam:PassRole'
             Resource:
