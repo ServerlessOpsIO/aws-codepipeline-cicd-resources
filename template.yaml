@@ -37,8 +37,6 @@ Conditions:
   MissingPipelineUser: !Equals [!Ref PipelineUserArn, ""]
   MissingPipelineExecutionRole: !Equals [!Ref PipelineExecutionRoleArn, ""]
   MissingCloudFormationExecutionRole: !Equals [!Ref CloudFormationExecutionRoleArn, ""]
-  MissingArtifactsBucket: !Equals [!Ref ArtifactsBucketArn, ""]
-  MissingArtifactsBucketKmsKey: !Equals [!Ref ArtifactsBucketKmsKeyArn, ""]
   MissingDeployAccounts: !Equals [!Select [0, !Ref DeployAccounts], ""]
   ShouldHaveImageRepository: !Or [!Equals [!Ref CreateImageRepository, "true"], !Not [!Equals [!Ref ImageRepositoryArn, ""]]]
   MissingImageRepository: !And [!Condition ShouldHaveImageRepository, !Equals [!Ref ImageRepositoryArn, ""]]
@@ -170,7 +168,7 @@ Resources:
 
   ArtifactsBucketKmsKey:
     Type: AWS::KMS::Key
-    Condition: MissingArtifactsBucketKmsKey
+    Condition: IsBuildPipeline
     Properties:
       Description: Artifact Bucket KMS key
       MultiRegion: true
@@ -204,7 +202,7 @@ Resources:
 
   ArtifactsBucketKmsKeySsmParam:
     Type: AWS::SSM::Parameter
-    Condition: MissingArtifactsBucketKmsKey
+    Condition: IsBuildPipeline
     Properties:
       Name: !Sub "/cicd/${ServiceEnv}/ArtifactsBucketKmsKey"
       Type: "String"
@@ -214,7 +212,7 @@ Resources:
 
   ArtifactsBucket:
     Type: AWS::S3::Bucket
-    Condition: MissingArtifactsBucket
+    Condition: IsBuildPipeline
     DeletionPolicy: "Retain"
     UpdateReplacePolicy: "Retain"
     Properties:
@@ -234,7 +232,7 @@ Resources:
 
   ArtifactsBucketSsmParameter:
     Type: AWS::SSM::Parameter
-    Condition: MissingArtifactsBucket
+    Condition: IsBuildPipeline
     Properties:
       Name: !Sub "/cicd/${ServiceEnv}/ArtifactsBucket"
       Type: "String"
@@ -243,7 +241,7 @@ Resources:
 
   ArtifactsBucketPolicy:
     Type: AWS::S3::BucketPolicy
-    Condition: MissingArtifactsBucket
+    Condition: IsBuildPipeline
     Properties:
       Bucket: !Ref ArtifactsBucket
       PolicyDocument:
@@ -304,7 +302,7 @@ Resources:
 
   ArtifactsLoggingBucket:
     Type: AWS::S3::Bucket
-    Condition: MissingArtifactsBucket
+    Condition: IsBuildPipeline
     DeletionPolicy: "Retain"
     UpdateReplacePolicy: "Retain"
     Properties:
@@ -321,7 +319,7 @@ Resources:
 
   ArtifactsLoggingBucketPolicy:
     Type: AWS::S3::BucketPolicy
-    Condition: MissingArtifactsBucket
+    Condition: IsBuildPipeline
     Properties:
       Bucket: !Ref ArtifactsLoggingBucket
       PolicyDocument:
@@ -382,13 +380,13 @@ Resources:
               - 's3:List*'
             Resource:
               Fn::If:
-                - MissingArtifactsBucket
+                - IsBuildPipeline
                 - - !Join [ '',[ !GetAtt ArtifactsBucket.Arn, '/*' ] ]
                   - !GetAtt ArtifactsBucket.Arn
                 - - !Join [ '',[ !Ref ArtifactsBucketArn, '/*' ] ]
                   - !Ref ArtifactsBucketArn
           - Fn::If:
-            - MissingArtifactsBucketKmsKey
+            - IsBuildPipeline
             - Effect: Allow
               Action:
                 - kms:DescribeKey
@@ -519,7 +517,7 @@ Outputs:
     Description: ARN of the Artifacts bucket
     Value:
       Fn::If:
-        - MissingArtifactsBucket
+        - IsBuildPipeline
         - !GetAtt ArtifactsBucket.Arn
         - !Ref ArtifactsBucketArn
 
@@ -527,7 +525,7 @@ Outputs:
     Description: ARN of the Artifacts bucket KMS key
     Value:
       Fn::If:
-        - MissingArtifactsBucketKmsKey
+        - IsBuildPipeline
         - !GetAtt ArtifactsBucketKmsKey.Arn
         - !Ref ArtifactsBucketKmsKeyArn
 
