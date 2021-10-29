@@ -9,6 +9,8 @@ dev: flake lint test
 pr: init dev
 
 SAM_TEMPLATE ?= template.yaml
+TRANSFORM_TEMPLATE ?= transform-template.yaml
+TRANSFORM_STACKNAME ?= aws-codepipeline-cfn-transform
 ENV ?= ${USER}
 STACKNAME = $(shell basename ${CURDIR})-$(ENV)
 AWS_REGION ?= $(shell aws configure get region)
@@ -28,6 +30,10 @@ validate:
 	@cfn-lint template.yaml
 	$(info validating SAM template)
 	@sam validate
+
+deploy-transform: validate
+	$(info Deploying string transform stack)
+	sam deploy --stack-name $(TRANSFORM_STACKNAME) --region ${AWS_REGION} --resolve-s3 --template $(TRANSFORM_TEMPLATE)
 
 deploy: validate build
 	$(info Deploying to personal development stack)
