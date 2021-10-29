@@ -2,8 +2,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
 Parameters:
-  ServiceEnv:
-    Type: String
   GitProviderType:
     Type: String
     Default: "GitHub"
@@ -15,6 +13,7 @@ Parameters:
     Default: ""
   ArtifactsBucketArn:
     Type: String
+    Default: ""
   ArtifactsBucketKmsKeyArn:
     Type: String
     Default: ""
@@ -93,7 +92,7 @@ Resources:
   CloudFormationExecutionRoleArnSsmParam:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: !Sub "/cicd/${ServiceEnv}/CfnExecutionRoleArn"
+      Name: !Sub "/${AWS::StackName}/BuildCfnExecutionRoleArn"
       Type: "String"
       Description: "CloudFormation Execution IAM Role ARN"
       Value: !GetAtt CloudFormationExecutionRole.Arn
@@ -144,7 +143,7 @@ Resources:
   PipelineExecutionRoleArnSsmParam:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: !Sub "/cicd/${ServiceEnv}/PipelineExecutionRoleArn"
+      Name: !Sub "/${AWS::StackName}/BuildPipelineExecutionRoleArn"
       Type: "String"
       Description: "Shared build pipelineeExecution IAM Role ARN"
       Value: !GetAtt PipelineExecutionRole.Arn
@@ -187,7 +186,7 @@ Resources:
     Type: AWS::SSM::Parameter
     Condition: IsBuildPipeline
     Properties:
-      Name: !Sub "/cicd/${ServiceEnv}/ArtifactsBucketKmsKey"
+      Name: !Sub "/${AWS::StackName}/ArtifactsBucketKmsKey"
       Type: "String"
       Description: "KMS key for artifacts"
       Value: !GetAtt ArtifactsBucketKmsKey.Arn
@@ -217,7 +216,7 @@ Resources:
     Type: AWS::SSM::Parameter
     Condition: IsBuildPipeline
     Properties:
-      Name: !Sub "/cicd/${ServiceEnv}/ArtifactsBucket"
+      Name: !Sub "/${AWS::StackName}/ArtifactsBucket"
       Type: "String"
       Description: "Artifacts bucket name"
       Value: !Ref ArtifactsBucket
@@ -413,7 +412,7 @@ Resources:
     Properties:
       Type: String
       Description: "ARN of CodeStar connection"
-      Name: !Sub "/cicd/${ServiceEnv}/CodeStarConnectionArn"
+      Name: !Sub "/${AWS::StackName}/CodeStarConnectionArn"
       Value: !Ref CodeStarConnection
 
   ImageRepository:
