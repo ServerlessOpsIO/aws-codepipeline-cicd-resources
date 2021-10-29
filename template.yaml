@@ -122,13 +122,13 @@ Resources:
                 AWS: !GetAtt PipelineUser.Arn
               Action:
                 - 'sts:AssumeRole'
-            - Fn::NoValue
+            - !Ref AWS::NoValue
           - Effect: Allow
             Principal:
               # Allow roles with tag Role=aws-sam-pipeline-codebuild-service-role to assume this role.
               # This is required when CodePipeline is the CI/CD system of choice.
               AWS:
-                - !If
+                Fn::If:
                   - IsBuildPipeline
                   - !Ref AWS::AccountId
                   - !Ref BuildAccount
@@ -137,8 +137,8 @@ Resources:
             Condition:
                 StringLike:
                   aws:PrincipalTag/Role:
-                  - codepipeline-execution-role
-                  - codebuild-service-role
+                    - codepipeline-execution-role
+                    - codebuild-service-role
 
   PipelineExecutionRoleArnSsmParam:
     Type: AWS::SSM::Parameter
