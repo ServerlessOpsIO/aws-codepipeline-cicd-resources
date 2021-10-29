@@ -22,6 +22,7 @@ Resources:
       Code:
         ZipFile: |
           import traceback
+          import re
           def handler(event, context):
               response = {
                   "requestId": event["requestId"],
@@ -53,6 +54,10 @@ Resources:
                               response["status"] = "failure"
                       else:
                           response["fragment"] = input[:length]
+                  elif operation == "Regex":
+                    match = event["params"]["Match"]
+                    replace = event["params"]["Replace"]
+                    response["fragment"] = re.sub(match, replace, input)
                   else:
                       response["status"] = "failure"
               except Exception as e:
