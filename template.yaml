@@ -27,9 +27,13 @@ Parameters:
     AllowedValues: [true, false]
   ImageRepositoryArn:
     Type: String
+    Default: ""
+  BuildPipeline:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
 
 Conditions:
-  MissingGitProviderType: !Not [!Equals [!Ref GitProviderType, ""]]
   MissingPipelineUser: !Equals [!Ref PipelineUserArn, ""]
   MissingPipelineExecutionRole: !Equals [!Ref PipelineExecutionRoleArn, ""]
   MissingCloudFormationExecutionRole: !Equals [!Ref CloudFormationExecutionRoleArn, ""]
@@ -38,6 +42,7 @@ Conditions:
   MissingDeployAccounts: !Equals [!Select [0, !Ref DeployAccounts], ""]
   ShouldHaveImageRepository: !Or [!Equals [!Ref CreateImageRepository, "true"], !Not [!Equals [!Ref ImageRepositoryArn, ""]]]
   MissingImageRepository: !And [!Condition ShouldHaveImageRepository, !Equals [!Ref ImageRepositoryArn, ""]]
+  IsBuildPipeline: !Equals [!Ref BuildPipeline, "true"]
 
 Resources:
   PipelineUser:
@@ -417,7 +422,7 @@ Resources:
                   - !Ref ImageRepositoryArn
             - !Ref AWS::NoValue
           - Fn::If:
-            - MissingGitProviderType
+            - IsBuildPipeline
             - Effect: "Allow"
               Action:
                 - "codestar-connections:UseConnection"
@@ -428,14 +433,14 @@ Resources:
 
   CodeStarConnection:
     Type: AWS::CodeStarConnections::Connection
-    Condition: MissingGitProviderType
+    Condition: IsBuildPipeline
     Properties:
       ConnectionName: GitRepositoryConnection
       ProviderType: !Ref GitProviderType
 
   CodeStarConnectionArnSsmParam:
     Type: AWS::SSM::Parameter
-    Condition: MissingGitProviderType
+    Condition: IsBuildPipeline
     Properties:
       Type: String
       Description: "ARN of CodeStar connection"
