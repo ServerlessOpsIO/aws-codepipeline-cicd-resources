@@ -24,8 +24,24 @@ Parameters:
     Type: String
     AllowedValues: ["true", "false"]
     Default: "true"
+  DevPipelineExecutionRole:
+    Type: String
+    Default: ""
+  DevCfnExecutionRole:
+    Type: String
+    Default: ""
+  ProdPipelineExecutionRole:
+    Type: String
+    Default: ""
+  ProdCfnExecutionRole:
+    Type: String
+    Default: ""
 
 Conditions:
+  HasDevPipelineExecutionRole: !Not [!Equals [!Ref DevPipelineExecutionRole, ""]]
+  HasDevCfnExecutionRole: !Not [!Equals [!Ref DevCfnExecutionRole, ""]]
+  HasProdPipelineExecutionRole: !Not [!Equals [!Ref ProdPipelineExecutionRole, ""]]
+  HasProdCfnExecutionRole: !Not [!Equals [!Ref ProdCfnExecutionRole, ""]]
   MissingDeployAccounts: !Equals [!Select [0, !Ref DeployAccounts], ""]
   IsBuildPipeline: !Equals [!Ref BuildPipeline, "true"]
 
@@ -147,6 +163,43 @@ Resources:
       Type: "String"
       Description: "Shared build pipelineeExecution IAM Role ARN"
       Value: !GetAtt PipelineExecutionRole.Arn
+
+  DevPipelineExecutionRoleArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: HasDevPipelineExecutionRole
+    Properties:
+      Name: !Sub "/${AWS::StackName}/DevPipelineExecutionRoleArn"
+      Type: "String"
+      Description: "Dev deploy pipeline role"
+      Value: !Ref DevPipelineExecutionRole
+
+  DevCfnExecutionRoleArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: HasDevCfnExecutionRole
+    Properties:
+      Name: !Sub "/${AWS::StackName}/DevCfnExecutionRoleArn"
+      Type: "String"
+      Description: "Dev deploy CFN role"
+      Value: !Ref DevCfnExecutionRole
+
+  ProdPipelineExecutionRoleArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: HasProdPipelineExecutionRole
+    Properties:
+      Name: !Sub "/${AWS::StackName}/ProdPipelineExecutionRoleArn"
+      Type: "String"
+      Description: "Prod deploy pipeline role"
+      Value: !Ref ProdPipelineExecutionRole
+
+  ProdCfnExecutionRoleArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: HasProdCfnExecutionRole
+    Properties:
+      Name: !Sub "/${AWS::StackName}/ProdCfnExecutionRoleArn"
+      Type: "String"
+      Description: "Prod deploy CFN role"
+      Value: !Ref ProdCfnExecutionRole
+
 
   ArtifactsBucketKmsKey:
     Type: AWS::KMS::Key
