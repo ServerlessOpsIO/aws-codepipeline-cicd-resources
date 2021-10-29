@@ -21,10 +21,6 @@ Parameters:
   ArtifactsBucketKmsKeyArn:
     Type: String
     Default: ""
-  CreateImageRepository:
-    Type: String
-    Default: false
-    AllowedValues: [true, false]
   ImageRepositoryArn:
     Type: String
     Default: ""
@@ -38,8 +34,6 @@ Conditions:
   MissingPipelineExecutionRole: !Equals [!Ref PipelineExecutionRoleArn, ""]
   MissingCloudFormationExecutionRole: !Equals [!Ref CloudFormationExecutionRoleArn, ""]
   MissingDeployAccounts: !Equals [!Select [0, !Ref DeployAccounts], ""]
-  ShouldHaveImageRepository: !Or [!Equals [!Ref CreateImageRepository, "true"], !Not [!Equals [!Ref ImageRepositoryArn, ""]]]
-  MissingImageRepository: !And [!Condition ShouldHaveImageRepository, !Equals [!Ref ImageRepositoryArn, ""]]
   IsBuildPipeline: !Equals [!Ref BuildPipeline, "true"]
 
 Resources:
@@ -385,6 +379,20 @@ Resources:
                   - !GetAtt ArtifactsBucket.Arn
                 - - !Join [ '',[ !Ref ArtifactsBucketArn, '/*' ] ]
                   - !Ref ArtifactsBucketArn
+          - Effect: "Allow"
+            Action:
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:PutImage"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:UploadLayerPart"
+              - "ecr:CompleteLayerUpload"
+            Resource:
+              Fn::If:
+                - IsBuildPipeline
+                - !GetAtt ImageRepository.Arn
+                - !Ref ImageRepositoryArn
           - Fn::If:
             - IsBuildPipeline
             - Effect: Allow
@@ -397,27 +405,10 @@ Resources:
               Resource: !GetAtt ArtifactsBucketKmsKey.Arn
             - !Ref AWS::NoValue
           - Fn::If:
-            - ShouldHaveImageRepository
+            - IsBuildPipeline
             - Effect: "Allow"
               Action: "ecr:GetAuthorizationToken"
               Resource: "*"
-            - !Ref AWS::NoValue
-          - Fn::If:
-            - ShouldHaveImageRepository
-            - Effect: "Allow"
-              Action:
-                - "ecr:GetDownloadUrlForLayer"
-                - "ecr:BatchGetImage"
-                - "ecr:BatchCheckLayerAvailability"
-                - "ecr:PutImage"
-                - "ecr:InitiateLayerUpload"
-                - "ecr:UploadLayerPart"
-                - "ecr:CompleteLayerUpload"
-              Resource:
-                Fn::If:
-                  - MissingImageRepository
-                  - !GetAtt ImageRepository.Arn
-                  - !Ref ImageRepositoryArn
             - !Ref AWS::NoValue
           - Fn::If:
             - IsBuildPipeline
@@ -447,7 +438,7 @@ Resources:
 
   ImageRepository:
     Type: AWS::ECR::Repository
-    Condition: MissingImageRepository
+    Condition: IsBuildPipeline
     Properties:
       RepositoryPolicyText:
         Version: "2012-10-17"
@@ -482,6 +473,15 @@ Resources:
               - "ecr:InitiateLayerUpload"
               - "ecr:UploadLayerPart"
               - "ecr:CompleteLayerUpload"
+
+  ImageRepositoryArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: IsBuildPipeline
+    Properties:
+      Type: String
+      Description: "ARN of ECR repo"
+      Name: !Sub "/${AWS::StackName}/ImageRepositoryArn"
+      Value: !GetAtt ImageRepository.Arn
 
 Outputs:
   PipelineUser:
@@ -531,9 +531,9 @@ Outputs:
 
   ImageRepository:
     Description: ARN of the ECR image repository
-    Condition: ShouldHaveImageRepository
+    Condition: IsBuildPipeline
     Value:
       Fn::If:
-        - MissingImageRepository
+        - IsBuildPipeline
         - !GetAtt ImageRepository.Arn
         - !Ref ImageRepositoryArn
