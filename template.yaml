@@ -393,17 +393,18 @@ Resources:
                 - IsBuildPipeline
                 - !GetAtt ImageRepository.Arn
                 - !Ref ImageRepositoryArn
-          - Fn::If:
-            - IsBuildPipeline
-            - Effect: Allow
-              Action:
-                - kms:DescribeKey
-                - kms:GenerateDataKey*
-                - kms:Encrypt
-                - kms:ReEncrypt*
-                - kms:Decrypt
-              Resource: !GetAtt ArtifactsBucketKmsKey.Arn
-            - !Ref AWS::NoValue
+          - Effect: Allow
+            Action:
+              - kms:DescribeKey
+              - kms:GenerateDataKey*
+              - kms:Encrypt
+              - kms:ReEncrypt*
+              - kms:Decrypt
+            Resource:
+              Fn::If:
+                - IsBuildPipeline
+                - !GetAtt ArtifactsBucketKmsKey.Arn
+                - !Ref ArtifactsBucketKmsKeyArn
           - Fn::If:
             - IsBuildPipeline
             - Effect: "Allow"
