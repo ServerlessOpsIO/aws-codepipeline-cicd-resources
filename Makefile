@@ -12,6 +12,7 @@ SAM_TEMPLATE ?= template.yaml
 ENV ?= ${USER}
 STACKNAME = $(shell basename ${CURDIR})-$(ENV)
 AWS_REGION ?= $(shell aws configure get region)
+DEPLOY_ACCOUNTS ?= "355364402302,641494176294"
 
 check_profile:
 	# Make sure we have a user-scoped credentials profile set. We don't want to be accidentally using the default profile
@@ -30,7 +31,7 @@ validate:
 
 deploy: validate build
 	$(info Deploying to personal development stack)
-	sam deploy --stack-name $(STACKNAME) --region ${AWS_REGION} --resolve-s3 --parameter-overrides ServiceEnv=$(ENV)
+	sam deploy --stack-name $(STACKNAME) --region ${AWS_REGION} --resolve-s3 --parameter-overrides ServiceEnv=$(ENV) DeployAccounts=$(DEPLOY_ACCOUNTS)
 
 describe:
 	$(info Describing stack)
