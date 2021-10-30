@@ -156,6 +156,124 @@ Resources:
                   aws:PrincipalTag/Role:
                     - codepipeline-execution-role
                     - codebuild-service-role
+      Policies:
+        - PolicyName: AssumePipelineRoles
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/Role: codepipeline-execution-role
+        - PolicyName: PassCfnRoleToServices
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 'iam:PassRole'
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+        - PolicyName: CodeBuild
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # FIXME: Deploy accounts shouldn't need this.
+              - Effect: Allow
+                Action:
+                  - "codebuild:StartBuild"
+                  - "codebuild:BatchGetBuilds"
+                Resource: "*"
+        - PolicyName: CloudFormationService
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "cloudformation:CreateChangeSet"
+                  - "cloudformation:DeleteChangeSet"
+                  - "cloudformation:DescribeChangeSet"
+                  - "cloudformation:ExecuteChangeSet"
+                  - "cloudformation:DescribeStackEvents"
+                  - "cloudformation:DescribeStacks"
+                  - "cloudformation:GetTemplateSummary"
+                  - "cloudformation:DescribeStackResource"
+                Resource: '*'
+        - PolicyName: ArtifactBucketAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject*'
+                  - 's3:PutObject*'
+                  - 's3:GetBucket*'
+                  - 's3:List*'
+                Resource:
+                  Fn::If:
+                    - IsBuildPipeline
+                    - - !Join [ '',[ !GetAtt ArtifactsBucket.Arn, '/*' ] ]
+                      - !GetAtt ArtifactsBucket.Arn
+                    - - !Join [ '',[ !Ref ArtifactsBucketArn, '/*' ] ]
+                      - !Ref ArtifactsBucketArn
+        - PolicyName: EcrFetch
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "ecr:BatchCheckLayerAvailability"
+                Resource:
+                  Fn::If:
+                    - IsBuildPipeline
+                    - !GetAtt ImageRepository.Arn
+                    - !Ref ImageRepositoryArn
+        - PolicyName: KmsKeyAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kms:DescribeKey
+                  - kms:GenerateDataKey*
+                  - kms:Encrypt
+                  - kms:ReEncrypt*
+                  - kms:Decrypt
+                Resource:
+                  Fn::If:
+                    - IsBuildPipeline
+                    - !GetAtt ArtifactsBucketKmsKey.Arn
+                    - !Ref ArtifactsBucketKmsKeyArn
+        - Fn::If:
+          - IsBuildPipeline
+          - PolicyName: EcrAccess
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - "ecr:GetAuthorizationToken"
+                    - "ecr:PutImage"
+                    - "ecr:InitiateLayerUpload"
+                    - "ecr:UploadLayerPart"
+                    - "ecr:CompleteLayerUpload"
+                  Resource: "*"
+          - !Ref AWS::NoValue
+        - Fn::If:
+          - IsBuildPipeline
+          - PolicyName: CodeStar
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - "codestar-connections:UseConnection"
+                  Resource: !Ref CodeStarConnection
+          - !Ref AWS::NoValue
+
 
   PipelineExecutionRoleArnSsmParam:
     Type: AWS::SSM::Parameter
@@ -217,6 +335,17 @@ Resources:
             Principal:
               AWS: !Ref AWS::AccountId
             Action: kms:*
+            Resource: '*'
+          - Sid: Allow codepipeline
+            Effect: Allow
+            Principal:
+              Service: 'codepipeline.amazonaws.com'
+            Action:
+              - kms:DescribeKey
+              - kms:GenerateDataKey*
+              - kms:Encrypt
+              - kms:ReEncrypt*
+              - kms:Decrypt
             Resource: '*'
           - Sid: Allow access through S3 for all deployment account pipeline roles
             Effect: Allow
@@ -364,94 +493,55 @@ Resources:
               Bool:
                 aws:SecureTransport: false
 
-  PipelineExecutionRolePermissionPolicy:
-    Type: AWS::IAM::Policy
+  CodeBuildServicePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: IsBuildPipeline
     Properties:
-      PolicyName: PipelineExecutionRolePermissions
+      Description: "Managed policy for CodeBuild service roles"
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Effect: Allow
+          - Sid: CodeBuildLogs
+            Effect: Allow
             Action:
-              - sts:AssumeRole
-            Resource: "*"
-            Condition:
-              StringEquals:
-                aws:ResourceTag/Role: codepipeline-execution-role
-          - Effect: Allow
-            Action: 'iam:PassRole'
-            Resource: !GetAtt CloudFormationExecutionRole.Arn
-          # FIXME: Deploy accounts shouldn't need this.
-          - Effect: Allow
-            Action:
-              - "codebuild:StartBuild"
-              - "codebuild:BatchGetBuilds"
-            Resource: "*"
-          - Effect: Allow
-            Action:
-              - "cloudformation:CreateChangeSet"
-              - "cloudformation:DeleteChangeSet"
-              - "cloudformation:DescribeChangeSet"
-              - "cloudformation:ExecuteChangeSet"
-              - "cloudformation:DescribeStackEvents"
-              - "cloudformation:DescribeStacks"
-              - "cloudformation:GetTemplateSummary"
-              - "cloudformation:DescribeStackResource"
-            Resource: '*'
-          - Effect: Allow
-            Action:
-              - 's3:GetObject*'
-              - 's3:PutObject*'
-              - 's3:GetBucket*'
-              - 's3:List*'
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
             Resource:
-              Fn::If:
-                - IsBuildPipeline
-                - - !Join [ '',[ !GetAtt ArtifactsBucket.Arn, '/*' ] ]
-                  - !GetAtt ArtifactsBucket.Arn
-                - - !Join [ '',[ !Ref ArtifactsBucketArn, '/*' ] ]
-                  - !Ref ArtifactsBucketArn
-          - Effect: "Allow"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
+          - Sid: ArtifactBucketAccess
+            Effect: Allow
             Action:
-              - "ecr:GetDownloadUrlForLayer"
-              - "ecr:BatchGetImage"
-              - "ecr:BatchCheckLayerAvailability"
-              - "ecr:PutImage"
-              - "ecr:InitiateLayerUpload"
-              - "ecr:UploadLayerPart"
-              - "ecr:CompleteLayerUpload"
+              - "s3:GetObject"
+              - "s3:GetObjectVersion"
+              - "s3:PutObject"
             Resource:
-              Fn::If:
-                - IsBuildPipeline
-                - !GetAtt ImageRepository.Arn
-                - !Ref ImageRepositoryArn
-          - Effect: Allow
+              - !Join ['',[!GetAtt ArtifactsBucket.Arn, '/*']]
+          - Sid: ListPoliciesForSamCli
+            Effect: Allow
+            Action:
+              - "iam:ListPolicies"
+            Resource:
+              - "*"
+          - Sid: PipelineKmsKeyAccess
+            Effect: Allow
             Action:
               - kms:DescribeKey
               - kms:GenerateDataKey*
               - kms:Encrypt
               - kms:ReEncrypt*
               - kms:Decrypt
-            Resource:
-              Fn::If:
-                - IsBuildPipeline
-                - !GetAtt ArtifactsBucketKmsKey.Arn
-                - !Ref ArtifactsBucketKmsKeyArn
-          - Fn::If:
-            - IsBuildPipeline
-            - Effect: "Allow"
-              Action: "ecr:GetAuthorizationToken"
-              Resource: "*"
-            - !Ref AWS::NoValue
-          - Fn::If:
-            - IsBuildPipeline
-            - Effect: "Allow"
-              Action:
-                - "codestar-connections:UseConnection"
-              Resource: !Ref CodeStarConnection
-            - !Ref AWS::NoValue
-      Roles:
-        - !Ref PipelineExecutionRole
+            Resource: !GetAtt ArtifactsBucketKmsKey.Arn
+
+  CodeBuildServicePolicyArnSsmParameter:
+    Type: AWS::SSM::Parameter
+    Condition: IsBuildPipeline
+    Properties:
+      Name: !Sub "/${AWS::StackName}/CodeBuildServicePolicyArn"
+      Type: "String"
+      Description: "CodeBuild service managed policy ARN"
+      Value: !Ref CodeBuildServicePolicy
+
 
   CodeStarConnection:
     Type: AWS::CodeStarConnections::Connection
@@ -489,9 +579,7 @@ Resources:
           - Sid: AllowPushPull
             Effect: Allow
             Principal:
-              AWS:
-                - !GetAtt PipelineExecutionRole.Arn
-                - !GetAtt CloudFormationExecutionRole.Arn
+              AWS: !Ref AWS::AccountId
             Action:
               - "ecr:GetDownloadUrlForLayer"
               - "ecr:BatchGetImage"
@@ -500,6 +588,11 @@ Resources:
               - "ecr:InitiateLayerUpload"
               - "ecr:UploadLayerPart"
               - "ecr:CompleteLayerUpload"
+            Condition:
+                StringLike:
+                  aws:PrincipalTag/Role:
+                    - codepipeline-execution-role
+                    - cloudformation-execution-role
           - Sid: AllowPushPullCrossAccount
             Effect: Allow
             Principal:
