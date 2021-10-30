@@ -10,11 +10,13 @@ pr: init dev
 
 SAM_TEMPLATE ?= template.yaml
 TRANSFORM_TEMPLATE ?= transform-template.yaml
-TRANSFORM_STACKNAME ?= aws-codepipeline-cfn-transform
+TRANSFORM_STACKNAME ?= codepipeline-cfn-transform
 ENV ?= ${USER}
-STACKNAME = $(shell basename ${CURDIR})-$(ENV)
+BUILD_STACKNAME = codepipeline-build-$(ENV)
+DEPLOY_STACKNAME = codepipeline-deploy-$(ENV)
 AWS_REGION ?= $(shell aws configure get region)
 DEPLOY_ACCOUNTS ?= "355364402302,641494176294"
+BUILD_ACCOUNT ?= "346402060170"
 
 check_profile:
 	# Make sure we have a user-scoped credentials profile set. We don't want to be accidentally using the default profile
@@ -35,9 +37,34 @@ deploy-transform: validate
 	$(info Deploying string transform stack)
 	sam deploy --stack-name $(TRANSFORM_STACKNAME) --region ${AWS_REGION} --resolve-s3 --template $(TRANSFORM_TEMPLATE)
 
-deploy: validate build
-	$(info Deploying to personal development stack)
-	sam deploy --stack-name $(STACKNAME) --region ${AWS_REGION} --resolve-s3 --parameter-overrides ServiceEnv=$(ENV) DeployAccounts=$(DEPLOY_ACCOUNTS)
+deploy-build: validate build
+	$(info Deploying build stack for environment $(ENV))
+	sam deploy \
+		--stack-name $(BUILD_STACKNAME) \
+		--region ${AWS_REGION} \
+		--resolve-s3 \
+		--parameter-overrides \
+			DeployAccounts=$(DEPLOY_ACCOUNTS) \
+			DevPipelineExecutionRole=arn:aws:iam::355364402302:role/codepipeline-deploy-prime-PipelineExecutionRole-1RJELCC4B0ZZS \
+			DevCfnExecutionRole=arn:aws:iam::355364402302:role/codepipeline-deploy-prime-CloudFormationExecutionR-1S70T54200FFL \
+			ProdPipelineExecutionRole=arn:aws:iam::641494176294:role/codepipeline-deploy-prime-PipelineExecutionRole-Y49S9AATMRB9 \
+			ProdCfnExecutionRole=arn:aws:iam::641494176294:role/codepipeline-deploy-prime-CloudFormationExecutionR-1UCVUPIMOBDQH \
+			BuildPipeline=true
+
+deploy-deploy: validate build
+	$(info Deploying deploy stack for environment $(ENV))
+	sam deploy \
+		--stack-name $(DEPLOY_STACKNAME) \
+		--region ${AWS_REGION} \
+		--resolve-s3 \
+		--parameter-overrides \
+			BuildPipeline=false \
+			BuildAccount=$(BUILD_ACCOUNT)  \
+			ArtifactsBucketArn=arn:aws:s3:::codepipeline-build-prime-artifactsbucket-1a2aazfgk38hj \
+			ArtifactsBucketKmsKeyArn=arn:aws:kms:us-east-1:346402060170:key/mrk-5f536b59c2c94f6b84649a25e080640f\
+			ImageRepositoryArn=arn:aws:ecr:us-east-1:346402060170:repository/codepipeline-build-prime-imagerepository-fjwybjdbsgxz
+ \
+			BuildPipeline=false
 
 describe:
 	$(info Describing stack)
