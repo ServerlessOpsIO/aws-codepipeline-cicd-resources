@@ -51,9 +51,6 @@ Resources:
     Type: AWS::IAM::User
     Condition: IsBuildPipeline
     Properties:
-      Tags:
-        - Key: ManagedStackSource
-          Value: AwsSamCli
       Policies:
         - PolicyName: AssumeRoles
           PolicyDocument:
@@ -85,8 +82,6 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       Tags:
-        - Key: ManagedStackSource
-          Value: AwsSamCli
         - Key: Role
           Value: cloudformation-execution-role
       AssumeRolePolicyDocument:
@@ -118,8 +113,6 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       Tags:
-        - Key: ManagedStackSource
-          Value: AwsSamCli
         - Key: Role
           Value: codepipeline-execution-role
       AssumeRolePolicyDocument:
@@ -381,9 +374,6 @@ Resources:
     DeletionPolicy: "Retain"
     UpdateReplacePolicy: "Retain"
     Properties:
-      Tags:
-        - Key: ManagedStackSource
-          Value: AwsSamCli
       LoggingConfiguration:
         DestinationBucketName:
           !Ref ArtifactsLoggingBucket
@@ -466,9 +456,6 @@ Resources:
     UpdateReplacePolicy: "Retain"
     Properties:
       AccessControl: "LogDeliveryWrite"
-      Tags:
-        - Key: ManagedStackSource
-          Value: AwsSamCli
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
