@@ -46,8 +46,10 @@ deploy-build: validate build
 		--parameter-overrides \
 			DeployAccounts=$(DEPLOY_ACCOUNTS) \
 			DevPipelineExecutionRole=arn:aws:iam::355364402302:role/codepipeline-deploy-prime-PipelineExecutionRole-1RJELCC4B0ZZS \
+			DevCodeBuildServiceRole=arn:aws:iam::355364402302:role/codepipeline-deploy-prime-CodeBuildServiceRole-204VUL63KP2Y \
 			DevCfnExecutionRole=arn:aws:iam::355364402302:role/codepipeline-deploy-prime-CloudFormationExecutionR-1S70T54200FFL \
 			ProdPipelineExecutionRole=arn:aws:iam::641494176294:role/codepipeline-deploy-prime-PipelineExecutionRole-Y49S9AATMRB9 \
+			ProdCodeBuildServiceRole=arn:aws:iam::641494176294:role/codepipeline-deploy-prime-CodeBuildServiceRole-1IUYX5T367ELN \
 			ProdCfnExecutionRole=arn:aws:iam::641494176294:role/codepipeline-deploy-prime-CloudFormationExecutionR-1UCVUPIMOBDQH \
 			BuildPipeline=true
 

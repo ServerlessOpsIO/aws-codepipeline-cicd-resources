@@ -28,10 +28,16 @@ Parameters:
   DevPipelineExecutionRole:
     Type: String
     Default: ""
+  DevCodeBuildServiceRole:
+    Type: String
+    Default: ""
   DevCfnExecutionRole:
     Type: String
     Default: ""
   ProdPipelineExecutionRole:
+    Type: String
+    Default: ""
+  ProdCodeBuildServiceRole:
     Type: String
     Default: ""
   ProdCfnExecutionRole:
@@ -40,8 +46,10 @@ Parameters:
 
 Conditions:
   HasDevPipelineExecutionRole: !Not [!Equals [!Ref DevPipelineExecutionRole, ""]]
+  HasDevCodeBuildServiceRole: !Not [!Equals [!Ref DevCodeBuildServiceRole, ""]]
   HasDevCfnExecutionRole: !Not [!Equals [!Ref DevCfnExecutionRole, ""]]
   HasProdPipelineExecutionRole: !Not [!Equals [!Ref ProdPipelineExecutionRole, ""]]
+  HasProdCodeBuildServiceRole: !Not [!Equals [!Ref ProdCodeBuildServiceRole, ""]]
   HasProdCfnExecutionRole: !Not [!Equals [!Ref ProdCfnExecutionRole, ""]]
   MissingDeployAccounts: !Equals [!Select [0, !Ref DeployAccounts], ""]
   IsBuildPipeline: !Equals [!Ref BuildPipeline, "true"]
@@ -135,8 +143,6 @@ Resources:
             - !Ref AWS::NoValue
           - Effect: Allow
             Principal:
-              # Allow roles with tag Role=aws-sam-pipeline-codebuild-service-role to assume this role.
-              # This is required when CodePipeline is the CI/CD system of choice.
               AWS:
                 Fn::If:
                   - IsBuildPipeline
@@ -150,6 +156,8 @@ Resources:
                     - codepipeline-execution-role
                     - codebuild-service-role
       Policies:
+        # FIXME: What is this permission allowing? Is this maybe only needed
+        # in the build account?
         - PolicyName: AssumePipelineRoles
           PolicyDocument:
             Version: "2012-10-17"
@@ -159,8 +167,10 @@ Resources:
                   - sts:AssumeRole
                 Resource: "*"
                 Condition:
-                  StringEquals:
-                    aws:ResourceTag/Role: codepipeline-execution-role
+                  StringLike:
+                    aws:ResourceTag/Role:
+                      - codepipeline-execution-role
+                      - codebuild-service-role
         - PolicyName: PassCfnRoleToServices
           PolicyDocument:
             Version: "2012-10-17"
@@ -285,6 +295,15 @@ Resources:
       Description: "Dev deploy pipeline role"
       Value: !Ref DevPipelineExecutionRole
 
+  DevCodeBuildServiceRoleArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: HasDevCodeBuildServiceRole
+    Properties:
+      Name: !Sub "/${AWS::StackName}/DevCodeBuildServiceRoleArn"
+      Type: "String"
+      Description: "Dev CodeBuild service role"
+      Value: !Ref DevCodeBuildServiceRole
+
   DevCfnExecutionRoleArnSsmParam:
     Type: AWS::SSM::Parameter
     Condition: HasDevCfnExecutionRole
@@ -302,6 +321,15 @@ Resources:
       Type: "String"
       Description: "Prod deploy pipeline role"
       Value: !Ref ProdPipelineExecutionRole
+
+  ProdCodeBuildServiceRoleArnSsmParam:
+    Type: AWS::SSM::Parameter
+    Condition: HasProdCodeBuildServiceRole
+    Properties:
+      Name: !Sub "/${AWS::StackName}/ProdCodeBuildServiceRoleArn"
+      Type: "String"
+      Description: "Prod CodeBuild service role"
+      Value: !Ref ProdCodeBuildServiceRole
 
   ProdCfnExecutionRoleArnSsmParam:
     Type: AWS::SSM::Parameter
@@ -488,6 +516,16 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
+          - Sid: AssumeCrossAccountCodeBuildRoles
+            Effect: Allow
+            Action:
+              - "sts:AssumeRole"
+            Resource: "*"
+            Condition:
+              StringLike:
+                aws:ResourceTag/Role:
+                  - codepipeline-execution-role
+                  - codebuild-service-role
           - Sid: CodeBuildLogs
             Effect: Allow
             Action:
@@ -528,6 +566,146 @@ Resources:
       Type: "String"
       Description: "CodeBuild service managed policy ARN"
       Value: !Ref CodeBuildServicePolicy
+
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Tags:
+        - Key: Role
+          Value: codebuild-service-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          # FIXME: Need to prevent deploy account roles from assuming build account role
+          - Action:
+              - "sts:AssumeRole"
+            Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+          - Effect: Allow
+            Principal:
+              AWS:
+                Fn::If:
+                  - IsBuildPipeline
+                  - !Ref AWS::AccountId
+                  - !Ref BuildAccount
+            Action:
+              - 'sts:AssumeRole'
+            Condition:
+                StringLike:
+                  aws:PrincipalTag/Role:
+                    - codepipeline-execution-role
+                    - codebuild-service-role
+      ManagedPolicyArns:
+        - !If
+          - IsBuildPipeline
+          - !Ref CodeBuildServicePolicy
+          - !Ref AWS::NoValue
+      Policies:
+        Fn::If:
+          - IsBuildPipeline
+          - !Ref AWS::NoValue
+          - - PolicyName: CloudFormation
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "cloudformation:describe*"
+                    Resource: "*"
+            - PolicyName: CloudTrail
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "cloudtrail:*"
+                    Resource: "*"
+            - PolicyName: CloudWatch
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "cloudwatch:*"
+                    Resource: "*"
+            - PolicyName: CloudWatchLogs
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "logs:*"
+                    Resource: "*"
+            - PolicyName: DDB
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "dynamodb:*"
+                    Resource: "*"
+            - PolicyName: EventBridge
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "events:*"
+                    Resource: "*"
+            - PolicyName: Lambda
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "lambda:*"
+                    Resource: "*"
+            - PolicyName: S3
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "s3:*"
+                    Resource: "*"
+            - PolicyName: SNS
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "sns:*"
+                    Resource: "*"
+            - PolicyName: SQS
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "sqs:*"
+                    Resource: "*"
+            - PolicyName: SSM
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "ssm:*"
+                    Resource: "*"
+            - PolicyName: StepFunctions
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "states:*"
+                    Resource: "*"
+            - PolicyName: XRay
+              PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - "xray:*"
+                    Resource: "*"
+
+  CodeBuildServiceRoleArnSsmParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${AWS::StackName}/CodeBuildServiceRoleArn"
+      Type: "String"
+      Description: "CodeBuild service role ARN"
+      Value: !Ref CodeBuildServiceRole
 
 
   CodeStarConnection:
@@ -620,12 +798,16 @@ Outputs:
     Value: !Ref PipelineUserSecretKey
 
   CloudFormationExecutionRole:
-    Description: ARN of the IAM Role(CloudFormationExecutionRole)
+    Description: ARN of the IAM Role (CloudFormationExecutionRole)
     Value: !GetAtt CloudFormationExecutionRole.Arn
 
   PipelineExecutionRole:
-    Description: ARN of the IAM Role(PipelineExecutionRole)
+    Description: ARN of the IAM Role (PipelineExecutionRole)
     Value: !GetAtt PipelineExecutionRole.Arn
+
+  CodeBuildServiceRole:
+    Description: "ARN of the IAM Role (CodeBuildServiceRole)"
+    Value: !GetAtt CodeBuildServiceRole.Arn
 
   ArtifactsBucket:
     Description: ARN of the Artifacts bucket
